@@ -17,3 +17,21 @@ if you want to run only certain tests whenever the code changes try
     mvn scala:cctest -Dtest=MyTest
 
 which would run all tests containing MyTest in the name in any package
+
+
+Notes
+-----
+
+To get useful output when tests fail (like SBT does by default) please make sure you have configured the surefire plugin
+to set **useFile** to false then you get a reasonable report on the console of failures.
+
+e.g.
+
+
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <forkMode>once</forkMode>
+          <useFile>false</useFile>
+        </configuration>
+      </plugin>
