@@ -16,12 +16,9 @@
 package org_scala_tools_maven;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Calendar;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.reporting.MavenReport;
@@ -38,9 +35,11 @@ import org_scala_tools_maven_executions.MainHelper;
  * @requiresDependencyResolution compile
  * @execute phase="generate-sources"
  */
-public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
+public class ScalaDocMojo extends ScalaSourceMojoSupport implements MavenReport {
+
     /**
      * Specify window title of generated HTML documentation.
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${windowtitle}"
      *            default-value="${project.name} ${project.version} API"
@@ -52,6 +51,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
      * want to use html you have to put it in a CDATA section, eg.
      * &lt;![CDATA[Copyright 2005, &lt;a
      * href="http://www.mycompany.com">MyCompany, Inc.&lt;a>]]&gt;
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${bottom}"
      *            default-value="Copyright (c) {inceptionYear}-{currentYear} {organizationName}. All Rights Reserved."
@@ -60,6 +60,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * Charset for cross-platform viewing of generated documentation.
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${charset}" default-value="ISO-8859-1"
      */
@@ -67,6 +68,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * Include title for the overview page.
+     * [scaladoc, scaladoc2, vscaladoc]
      *
      * @parameter expression="${doctitle}"
      *            default-value="${project.name} ${project.version} API"
@@ -75,6 +77,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * Include footer text for each page.
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${footer}"
      */
@@ -82,6 +85,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * Include header text for each page
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${header}"
      */
@@ -89,6 +93,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * Generate source in HTML
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${linksource}" default-value="true"
      */
@@ -96,6 +101,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * Suppress description and tags, generate only declarations
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${nocomment}" default-value="false"
      */
@@ -103,6 +109,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * File to change style of the generated documentation
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${stylesheetfile}"
      */
@@ -110,17 +117,11 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * Include top text for each page
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${top}"
      */
     protected String top;
-
-    /**
-     * The directory in which to find scala source
-     *
-     * @parameter expression="${project.build.sourceDirectory}/../scala"
-     */
-    protected File sourceDir;
 
     /**
      * Specifies the destination directory where scalaDoc saves the generated
@@ -172,6 +173,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
 
     /**
      * To allow running aggregation only from command line use "-Dforce-aggregate=true" (avoid using in pom.xml).
+     * [scaladoc, vscaladoc]
      *
      * @parameter expression="${force-aggregate}" default-value="false"
      */
@@ -184,44 +186,47 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
      */
     protected boolean aggregateDirectOnly = true;
 
-    private String[] sourceFiles_ = null;
-
     /**
-     * A list of inclusion filters for the compiler.
+     * The directory which contains scala/java source files
      *
-     * @parameter
+     * @parameter expression="${project.build.sourceDirectory}/../scala"
      */
-    private Set<String> includes = new HashSet<String>();
+    protected File sourceDir;
 
-    /**
-     * A list of exclusion filters for the compiler.
-     *
-     * @parameter
-     */
-    private Set<String> excludes = new HashSet<String>();
+    private List<File> _sourceFiles;
 
-
-    private String[] findSourceFiles() {
-        if (sourceFiles_ == null) {
-            if(includes.isEmpty()) {
-                includes.add("**/*.scala");
-            }
-            sourceFiles_ = MainHelper.findFiles(sourceDir, includes.toArray(new String[includes.size()]), excludes.toArray(new String[excludes.size()]));
+    @Override
+    @SuppressWarnings("unchecked")
+    protected List<File> getSourceDirectories() throws Exception {
+        List<String> sources = project.getCompileSourceRoots();
+        //Quick fix in case the user has not added the "add-source" goal.
+        String scalaSourceDir = FileUtils.pathOf(sourceDir, useCanonicalPath);
+        if(!sources.contains(scalaSourceDir)) {
+            sources.add(scalaSourceDir);
         }
-        return sourceFiles_;
+        return normalize(sources);
     }
 
     public boolean canGenerateReport() {
-        try {
-            sourceDir = sourceDir.getCanonicalFile();
-        } catch (IOException exc) {
-            sourceDir = sourceDir.getAbsoluteFile();
-        }
-        // there is source to compile
-        boolean back = sourceDir.exists() && (findSourceFiles().length != 0);
         // there is modules to aggregate
-        back = back || ((project.isExecutionRoot() || forceAggregate) && canAggregate() && project.getCollectedProjects().size() > 0);
+        boolean back = ((project.isExecutionRoot() || forceAggregate) && canAggregate() && project.getCollectedProjects().size() > 0);
+        back = back || (findSourceFiles().size() != 0);
         return back;
+    }
+
+    /**
+     * @return
+     * @throws Exception
+     */
+    private List<File> findSourceFiles() {
+        if (_sourceFiles == null) {
+            try {
+                _sourceFiles = findSourceWithFilters();
+            } catch (Exception exc) {
+                throw new RuntimeException("can't define source to process", exc);
+            }
+        }
+        return _sourceFiles;
     }
 
     private boolean canAggregate() {
@@ -261,12 +266,11 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
         return reportOutputDirectory;
     }
 
-    public void setReportOutputDirectory(File reportOutputDirectory) {
-        if (reportOutputDirectory != null && !reportOutputDirectory.getAbsolutePath().endsWith(outputDirectory)) {
-            this.reportOutputDirectory = new File(reportOutputDirectory, outputDirectory);
-        }
-        else {
-            this.reportOutputDirectory = reportOutputDirectory;
+    public void setReportOutputDirectory(File v) {
+        if (v != null && outputDirectory != null && !v.getAbsolutePath().endsWith(outputDirectory)) {
+            this.reportOutputDirectory = new File(v, outputDirectory);
+        } else {
+            this.reportOutputDirectory = v;
         }
     }
 
@@ -284,7 +288,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
     protected JavaMainCaller getScalaCommand() throws Exception {
         //This ensures we have a valid scala version...
         checkScalaVersion();
-        boolean isPreviousScala271 = (new VersionNumber("2.7.1").compareTo(new VersionNumber(scalaVersion)) > 0);
+        boolean isPreviousScala271 = (new VersionNumber("2.7.1").compareTo(findScalaVersion()) > 0);
         if (StringUtils.isEmpty(scaladocClassName)) {
             if (!isPreviousScala271) {
                 scaladocClassName = "scala.tools.nsc.ScalaDoc";
@@ -303,9 +307,9 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
         List<String> paths = project.getCompileClasspathElements();
         paths.remove(project.getBuild().getOutputDirectory()); //remove output to avoid "error for" : error:  XXX is already defined as package XXX ... object XXX {
         jcmd.addOption("-classpath", MainHelper.toMultiPath(paths));
-        jcmd.addOption("-sourcepath", sourceDir.getAbsolutePath());
+        //jcmd.addOption("-sourcepath", sourceDir.getAbsolutePath());
 
-        boolean isScaladoc2 = (new VersionNumber("2.8.0").compareTo(new VersionNumber(scalaVersion)) <= 0) && ("scala.tools.nsc.ScalaDoc".equals(scaladocClassName));
+        boolean isScaladoc2 = (new VersionNumber("2.8.0").compareTo(findScalaVersion()) <= 0) && ("scala.tools.nsc.ScalaDoc".equals(scaladocClassName));
         if (isScaladoc2) {
             jcmd.addArgs("-doc-format:html");
             jcmd.addOption("-doc-title", doctitle);
@@ -327,7 +331,7 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
     public void generate(@SuppressWarnings("unused") Sink sink, @SuppressWarnings("unused") Locale locale) throws MavenReportException {
         try {
             if (!canGenerateReport()) {
-                getLog().warn("No source files found in " + sourceDir);
+                getLog().warn("No source files found");
                 return;
             }
 
@@ -344,16 +348,14 @@ public class ScalaDocMojo extends ScalaMojoSupport implements MavenReport {
                 dependencies = new BasicArtifact[]{artifact};
             }
 
-            if (sourceDir.exists()) {
+            List<File> sources = findSourceFiles();
+            if (sources.size() > 0) {
                 JavaMainCaller jcmd = getScalaCommand();
                 jcmd.addOption("-d", reportOutputDir.getAbsolutePath());
-                String[] sources = findSourceFiles();
-                if (sources.length > 0) {
-                    for (String x : sources) {
-                        jcmd.addArgs(sourceDir + File.separator + x);
-                    }
-                    jcmd.run(displayCmd);
+                for (File x : sources) {
+                    jcmd.addArgs(FileUtils.pathOf(x, useCanonicalPath));
                 }
+                jcmd.run(displayCmd);
             }
             if (forceAggregate) {
                 aggregate(project);

@@ -29,6 +29,7 @@ import org.apache.maven.plugin.MojoFailureException;
  * @phase test-compile
  * @goal testCompile
  * @requiresDependencyResolution test
+ * @threadSafe
  */
 public class ScalaTestCompileMojo extends ScalaCompilerSupport {
 
@@ -81,12 +82,12 @@ public class ScalaTestCompileMojo extends ScalaCompilerSupport {
 
     @Override
     @SuppressWarnings("unchecked")
-    protected List<String> getSourceDirectories() throws Exception {
+    protected List<File> getSourceDirectories() throws Exception {
         List<String> sources = project.getTestCompileSourceRoots();
         String scalaSourceDir = testSourceDir.getAbsolutePath();
         if(!sources.contains(scalaSourceDir)) {
             sources.add(scalaSourceDir);
         }
-        return sources;
+        return normalize(sources);
     }
 }

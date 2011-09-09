@@ -18,7 +18,6 @@ package org_scala_tools_maven;
 import java.io.File;
 import java.util.List;
 
-import org.codehaus.plexus.util.FileUtils;
 import org_scala_tools_maven_executions.JavaMainCaller;
 
 /**
@@ -89,7 +88,7 @@ public class ScalaContinuousCompileMojo extends ScalaCompilerSupport {
     }
 
     @Override
-    protected List<String> getSourceDirectories() throws Exception {
+    protected List<File> getSourceDirectories() throws Exception {
            throw new UnsupportedOperationException("USELESS");
     }
     @Override
@@ -105,17 +104,17 @@ public class ScalaContinuousCompileMojo extends ScalaCompilerSupport {
     @Override
     protected final void doExecute() throws Exception {
 
-        mainOutputDir = normalize(mainOutputDir);
+        mainOutputDir = FileUtils.fileOf(mainOutputDir, useCanonicalPath);
         if (!mainOutputDir.exists()) {
             mainOutputDir.mkdirs();
         }
-        mainSourceDir = normalize(mainSourceDir);
+        mainSourceDir = FileUtils.fileOf(mainSourceDir, useCanonicalPath);
 
-        testOutputDir = normalize(testOutputDir);
+        testOutputDir = FileUtils.fileOf(testOutputDir, useCanonicalPath);
         if (!testOutputDir.exists()) {
             testOutputDir.mkdirs();
         }
-        testSourceDir = normalize(testSourceDir);
+        testSourceDir = FileUtils.fileOf(testSourceDir, useCanonicalPath);
 
         if (useFsc) {
             getLog().info("use fsc for compilation");
@@ -137,6 +136,10 @@ public class ScalaContinuousCompileMojo extends ScalaCompilerSupport {
             int nbFile = 0;
             if (mainSourceDir.exists()) {
                 nbFile = compile(mainSourceDir, mainOutputDir, project.getCompileClasspathElements(), true);
+                // If there are no source files, the compile method returns -1. Thus, to make sure we
+                // still run the tests if there are test sources, reset nbFile to zero.
+                if (nbFile == -1)
+                    nbFile = 0;
             }
             if (testSourceDir.exists()) {
                 nbFile += compile(testSourceDir, testOutputDir, project.getTestClasspathElements(), true);

@@ -27,6 +27,7 @@ import org.apache.maven.model.Dependency;
  * @phase compile
  * @goal compile
  * @requiresDependencyResolution compile
+ * @threadSafe
  */
 public class ScalaCompileMojo extends ScalaCompilerSupport {
 
@@ -43,17 +44,17 @@ public class ScalaCompileMojo extends ScalaCompilerSupport {
      * @parameter expression="${project.build.sourceDirectory}/../scala"
      */
     protected File sourceDir;
-
+    
     @Override
     @SuppressWarnings("unchecked")
-    protected List<String> getSourceDirectories() throws Exception {
+    protected List<File> getSourceDirectories() throws Exception {
         List<String> sources = project.getCompileSourceRoots();
         //Quick fix in case the user has not added the "add-source" goal.
-        String scalaSourceDir = sourceDir.getCanonicalPath();
+        String scalaSourceDir = FileUtils.pathOf(sourceDir, useCanonicalPath);
         if(!sources.contains(scalaSourceDir)) {
             sources.add(scalaSourceDir);
         }
-        return sources;
+        return normalize(sources);
     }
 
     @SuppressWarnings("unchecked")
